@@ -1105,7 +1105,7 @@ void import_channels(sqlite3* instance, char const* json)
 		"json_extract(entry.value, '$.logourl') as logourl "	// <-- this one allows nulls
 		"from json_each(?1) as entry "
 		"where frequency is not null and "
-		"  ((frequency between 87500000 and 108000000) or "		// FM / HD
+		"  ((frequency between 75000000 and 108000000) or "		// FM / HD
 		"  (frequency between 174928000 and 239200000) or "		// DAB
 		"  (frequency between 162400000 and 162550000)) "		// WX
 		"  and modulation between 0 and 3 "
@@ -1113,10 +1113,10 @@ void import_channels(sqlite3* instance, char const* json)
 
 	// Remove any FM channels that are outside the frequency range
 	execute_non_query(instance, "delete from channel where modulation = 0 and "
-		"frequency not between 87500000 and 108000000");
+		"frequency not between 75000000 and 108000000");
 
 	// Remove any HD Radio channels that are outside the frequency range
-	execute_non_query(instance, "delete from channel where modulation = 0 and "
+	execute_non_query(instance, "delete from channel where modulation = 1 and "
 		"(frequency not between 87900000 and 107900000 or (frequency / 100000) % 2 = 0)");
 
 	// Remove any DAB channels that don't match an entry in namedchannel
