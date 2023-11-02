@@ -252,27 +252,28 @@ DEMUX_PACKET* fmstream::demuxread(std::function<DEMUX_PACKET*(int)> const& alloc
 	}
 
 	// Process the I/Q data, the original samples buffer can be reused/overwritten as it's processed
-	int audiopackets = m_demodulator->ProcessData(m_demodulator->GetInputBufferLimit(), samples.get(), samples.get());
+	std::unique_ptr<TYPEREAL[]> outsamples(new TYPEREAL[m_demodulator->GetInputBufferLimit()]);
+	int audiopackets = m_demodulator->ProcessData(m_demodulator->GetInputBufferLimit(), samples.get(), outsamples.get());
 
 	// Process any RDS group data that was collected during demodulation
 	tRDS_GROUPS rdsgroup = {};
 	while(m_demodulator->GetNextRdsGroupData(&rdsgroup)) m_rdsdecoder.decode_rdsgroup(rdsgroup);
 
 	// Determine the size of the demultiplexer packet data and allocate it
-	int packetsize = audiopackets * sizeof(TYPESTEREO16);
+	int packetsize = audiopackets * sizeof(TYPEMONO16);
 	DEMUX_PACKET* packet = allocator(packetsize);
 	if(packet == nullptr) return nullptr;
 
 	// Resample the audio data directly into the allocated packet buffer
 	audiopackets = m_resampler->Resample(audiopackets, (m_demodulator->GetOutputRate() / m_pcmsamplerate),
-		samples.get(), reinterpret_cast<TYPESTEREO16*>(packet->pData), m_pcmgain);
+		outsamples.get(), reinterpret_cast<TYPEMONO16*>(packet->pData), m_pcmgain);
 
 	// Calculate the proper duration for the packet
 	double duration = (audiopackets / static_cast<double>(m_pcmsamplerate)) * STREAM_TIME_BASE;
 
 	// Set up the demultiplexer packet with the proper size, duration and dts
 	packet->iStreamId = STREAM_ID_AUDIO;
-	packet->iSize = audiopackets * sizeof(TYPESTEREO16);
+	packet->iSize = audiopackets * sizeof(TYPEMONO16);
 	packet->duration = duration;
 	packet->dts = packet->pts = m_dts;
 
@@ -325,7 +326,7 @@ void fmstream::enumproperties(std::function<void(struct streamprops const& props
 	streamprops audio = {};
 	audio.codec = "pcm_s16le";
 	audio.pid = STREAM_ID_AUDIO;
-	audio.channels = 2;
+	audio.channels = 1;
 	audio.samplerate = static_cast<int>(m_pcmsamplerate);
 	audio.bitspersample = 16;
 	callback(audio);
